@@ -7,6 +7,9 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 import configparser
 import logging
 from liquipediapy import dota
+import redis
+
+global redis1
 
 dota_obj = dota("appname")
 
@@ -20,7 +23,8 @@ def main():
     # You can set this logging module, so you will know when and why things do not work as expected
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
-    
+    global redis1
+    redis1 = redis.Redis(host=(config['REDIS']['HOST']), password=(config['REDIS']['PASSWORD']), port=(config['REDIS']['REDISPORT']))
     # register a dispatcher to handle message: here we register an echo dispatcher
 
     
@@ -29,6 +33,7 @@ def main():
     states={players:[MessageHandler(Filters.text & (~Filters.command), player_check)]},
     fallbacks=[CommandHandler("quit", quit_command)])
     dispatcher.add_handler(conversation)
+    dispatcher.add_handler(CommandHandler("like", like))
     # dispatcher.add_handler(CommandHandler("hero", check_hero))
     # dispatcher.add_handler(CommandHandler("item", check_item))
     echo_handler = MessageHandler(Filters.text & (~Filters.command), echo)
@@ -45,7 +50,7 @@ def echo(update, context):
 
 def help_command(update: Updater, context: CallbackContext):
     """Send a message when the command /help is issued."""
-    update.message.reply_text("Please enter /player to check player's details")
+    update.message.reply_text("Please enter /player to check player's details\nEnter /like + Player's name to give a like")
 
 def check_player(update: Updater, context: CallbackContext):
     update.message.reply_text("Starting to check player's details\nEnter player name to check\nEnter /quit to quit")
@@ -60,6 +65,16 @@ def check_player(update: Updater, context: CallbackContext):
 #     items = dota_obj.get_items()
 #     for i in range(len(items)):
 #         update.message.reply_text(items[i])
+
+def like(update: Updater, context: CallbackContext):
+    try: 
+        global redis1
+        logging.info(context.args[0])
+        msg = context.args[0]   
+        redis1.incr(msg)
+        update.message.reply_text('You have liked ' + msg +  ' for ' + redis1.get(msg).decode('UTF-8') + ' times.')
+    except (IndexError, ValueError):
+        update.message.reply_text('Usage: /like <keyword>')
 
 def player_check(update: Updater, context: CallbackContext):
     try:
